@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
-	"os"
 )
 
 type pos struct {
@@ -48,9 +50,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var style = lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("63")).Width(24).Height(32)
+	var style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Width(48).
+		Height(24)
 	s := "[]>"
-	return style.Render(s)
+	return style.Render(s, strconv.Itoa(m.ship.y))
 }
 
 func main() {
