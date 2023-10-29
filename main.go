@@ -9,6 +9,11 @@ import (
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
+const (
+	maxWidth  = 40
+	maxHeight = 10
+)
+
 type pos struct {
 	x int
 	y int
@@ -36,7 +41,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+x", "q":
+		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
 			m.ship.y--
@@ -50,13 +55,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var style = lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
+	var screen = lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Width(48).
 		Height(24)
-	s := "[]>"
-	return style.Render(s, strconv.Itoa(m.ship.y))
+
+	ship := "[]>"
+	w, h := lipgloss.Size(screen.Render())
+
+	var screenArr [][]string
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if y == m.ship.y {
+				screenArr[y][0] = "S"
+			}
+			if x == len(w) {
+				screenArr[y][x]
+			}
+		}
+	}
+
+	return screen.Render(s, strconv.Itoa(m.ship.y))
 }
 
 func main() {
