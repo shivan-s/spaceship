@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
 const (
-	maxWidth  = 40
-	maxHeight = 10
+	maxHeight = 24
+	maxWidth  = 64
 )
 
 type pos struct {
@@ -23,6 +25,14 @@ type model struct {
 	firing   bool
 	ship     pos
 	asteroid pos
+}
+
+type TickMsg time.Time
+
+func createTick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return TickMsg(t)
+	})
 }
 
 func initialModel() model {
@@ -44,9 +54,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
-			m.ship.y--
+			if m.ship.y < 1 {
+				m.ship.y = maxHeight + 1
+			} else {
+				m.ship.y--
+			}
 		case "down", "j":
-			m.ship.y++
+			if m.ship.y > maxHeight {
+				m.ship.y = 0
+			} else {
+				m.ship.y++
+			}
 		case " ":
 			m.firing = true
 		}
@@ -55,28 +73,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var screen = lipgloss.NewStyle().
+	// ship := "[]>"
+	var gameScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Width(48).
-		Height(24)
+		Height(maxHeight).
+		Width(maxWidth)
 
-	ship := "[]>"
-	w, h := lipgloss.Size(screen.Render())
+	var scoreScreen = lipgloss.NewStyle().
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color("50")).
+		Width(maxWidth)
 
-	var screenArr [][]string
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			if y == m.ship.y {
-				screenArr[y][0] = "S"
+	var screenArr []string
+	for y := 0; y < maxHeight+1; y++ {
+		var innerArr []string
+		for x := 0; x < maxWidth-1; x++ {
+			if y == m.ship.y && x == 0 {
+				innerArr = append(innerArr, ">")
+			} else if y == m.ship.y && m.firing == true {
+				innerArr = append(innerArr, "~")
+			} else {
+				innerArr = append(innerArr, "0")
 			}
-			if x == len(w) {
-				screenArr[y][x]
-			}
+
 		}
+		innerArr = append(innerArr, "\n")
+		screenArr = append(screenArr, strings.Join(innerArr, ""))
 	}
 
-	return screen.Render(s, strconv.Itoa(m.ship.y))
+	m.firing = false
+	return lipgloss.JoinVertical(lipgloss.Center,
+		gameScreen.Render(strings.Join(screenArr, "")),
+		scoreScreen.Render(strconv.Itoa(m.ship.y)))
 }
 
 func main() {
