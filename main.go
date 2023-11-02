@@ -55,12 +55,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "up", "k":
 			if m.ship.y < 1 {
-				m.ship.y = maxHeight + 1
+				m.ship.y = maxHeight
 			} else {
 				m.ship.y--
 			}
 		case "down", "j":
-			if m.ship.y > maxHeight {
+			if m.ship.y > maxHeight-1 {
 				m.ship.y = 0
 			} else {
 				m.ship.y++
@@ -73,37 +73,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	// ship := "[]>"
+	ship := "[]>"
+	var titleScreen = lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("20")).
+		Width(maxWidth).
+		Align(lipgloss.Center)
 	var gameScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Height(maxHeight).
 		Width(maxWidth)
-
 	var scoreScreen = lipgloss.NewStyle().
-		BorderStyle(lipgloss.ThickBorder()).
+		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("50")).
-		Width(maxWidth)
+		Width(maxWidth).
+		Align(lipgloss.Center)
 
 	var screenArr []string
 	for y := 0; y < maxHeight+1; y++ {
 		var innerArr []string
-		for x := 0; x < maxWidth-1; x++ {
-			if y == m.ship.y && x == 0 {
-				innerArr = append(innerArr, ">")
-			} else if y == m.ship.y && m.firing == true {
-				innerArr = append(innerArr, "~")
+		for x := 0; x < maxWidth; x++ {
+			if y == m.ship.y {
+				if x == 0 {
+					innerArr = append(innerArr, ship)
+				} else if x > len(ship)-1 {
+					if m.firing == true {
+						innerArr = append(innerArr, "~")
+					} else {
+						innerArr = append(innerArr, "·")
+					}
+				}
 			} else {
-				innerArr = append(innerArr, "0")
+				innerArr = append(innerArr, "·")
 			}
-
 		}
 		innerArr = append(innerArr, "\n")
 		screenArr = append(screenArr, strings.Join(innerArr, ""))
 	}
-
-	m.firing = false
 	return lipgloss.JoinVertical(lipgloss.Center,
+		titleScreen.Render("Spaceship by Shivan"),
 		gameScreen.Render(strings.Join(screenArr, "")),
 		scoreScreen.Render(strconv.Itoa(m.ship.y)))
 }
