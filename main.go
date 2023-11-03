@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -16,12 +17,15 @@ const (
 	maxWidth  = 64
 )
 
+const ship = "[]>"
+
 type pos struct {
 	x int
 	y int
 }
 
 type model struct {
+	score    int
 	firing   bool
 	ship     pos
 	asteroid pos
@@ -29,26 +33,42 @@ type model struct {
 
 type TickMsg time.Time
 
-func createTick() tea.Cmd {
+func doTick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return TickMsg(t)
 	})
 }
 
+func resetAsteroid(m *model) {
+	m.asteroid.x = maxWidth - 1
+	m.asteroid.y = rand.Intn(maxHeight)
+}
+
 func initialModel() model {
 	return model{
-		ship: pos{x: 0, y: 0},
-
-		asteroid: pos{x: 0, y: 0},
+		ship:     pos{x: 0, y: rand.Intn(maxHeight)},
+		asteroid: pos{x: maxWidth - 1, y: rand.Intn(maxHeight)},
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	m.score = 0
+	return doTick()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case TickMsg:
+		m.firing = false
+		if m.asteroid.x < len(ship) {
+			resetAsteroid(&m)
+			m.asteroid.y = rand.Intn(maxHeight)
+			m.asteroid.x = maxWidth
+
+		} else {
+			m.asteroid.x = m.asteroid.x - 2
+		}
+		return m, doTick()
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -67,13 +87,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case " ":
 			m.firing = true
+			if m.ship.y == m.asteroid.y {
+				resetAsteroid(&m)
+				m.score++
+			}
 		}
 	}
 	return m, nil
 }
 
 func (m model) View() string {
-	ship := "[]>"
 	var titleScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("20")).
@@ -94,6 +117,9 @@ func (m model) View() string {
 	for y := 0; y < maxHeight+1; y++ {
 		var innerArr []string
 		for x := 0; x < maxWidth; x++ {
+			if x == m.asteroid.x && y == m.asteroid.y {
+				innerArr = append(innerArr, "*")
+			}
 			if y == m.ship.y {
 				if x == 0 {
 					innerArr = append(innerArr, ship)
@@ -101,11 +127,11 @@ func (m model) View() string {
 					if m.firing == true {
 						innerArr = append(innerArr, "~")
 					} else {
-						innerArr = append(innerArr, "·")
+						innerArr = append(innerArr, " ")
 					}
 				}
 			} else {
-				innerArr = append(innerArr, "·")
+				innerArr = append(innerArr, " ")
 			}
 		}
 		innerArr = append(innerArr, "\n")
@@ -114,7 +140,7 @@ func (m model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Center,
 		titleScreen.Render("Spaceship by Shivan"),
 		gameScreen.Render(strings.Join(screenArr, "")),
-		scoreScreen.Render(strconv.Itoa(m.ship.y)))
+		scoreScreen.Render("Score: ", strconv.Itoa(m.score)))
 }
 
 func main() {
