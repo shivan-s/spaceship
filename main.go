@@ -13,22 +13,24 @@ import (
 )
 
 const (
-	maxHeight = 24
-	maxWidth  = 64
+	H = 12
+	W = 48
 )
 
-const ship = "[]>"
+const SHIP = "[]>"
 
-type pos struct {
+type position struct {
 	x int
 	y int
+	s int
 }
 
 type model struct {
-	score    int
-	firing   bool
-	ship     pos
-	asteroid pos
+	isGameOver bool
+	score      int
+	firing     bool
+	ship       position
+	asteroids  []position
 }
 
 type TickMsg time.Time
@@ -39,35 +41,36 @@ func doTick() tea.Cmd {
 	})
 }
 
-func resetAsteroid(m *model) {
-	m.asteroid.x = maxWidth - 1
-	m.asteroid.y = rand.Intn(maxHeight)
-}
-
 func initialModel() model {
 	return model{
-		ship:     pos{x: 0, y: rand.Intn(maxHeight)},
-		asteroid: pos{x: maxWidth - 1, y: rand.Intn(maxHeight)},
+		isGameOver: false,
+		score:      0,
+		ship:       position{x: 0, y: rand.Intn(H), s: 0},
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	m.score = 0
 	return doTick()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case TickMsg:
-		m.firing = false
-		if m.asteroid.x < len(ship) {
-			resetAsteroid(&m)
-			m.asteroid.y = rand.Intn(maxHeight)
-			m.asteroid.x = maxWidth
-
-		} else {
-			m.asteroid.x = m.asteroid.x - 2
+		for i, asteroid := range m.asteroids {
+			m.asteroids[i].x = asteroid.x - asteroid.s
+			if asteroid.x < len(SHIP) {
+				m.isGameOver = true
+			} else if m.firing == true && m.ship.y == asteroid.y {
+				m.score++
+				m.asteroids[i] = m.asteroids[len(m.asteroids)-1]
+				m.asteroids = m.asteroids[:len(m.asteroids)-1]
+			}
 		}
+		if rand.Intn(2) == 0 {
+			newAsteroid := position{x: W - 2, y: rand.Intn(H), s: rand.Intn(3) + 1}
+			m.asteroids = append(m.asteroids, newAsteroid)
+		}
+		m.firing = false
 		return m, doTick()
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -75,22 +78,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "up", "k":
 			if m.ship.y < 1 {
-				m.ship.y = maxHeight
+				m.ship.y = H
 			} else {
 				m.ship.y--
 			}
 		case "down", "j":
-			if m.ship.y > maxHeight-1 {
+			if m.ship.y > H-1 {
 				m.ship.y = 0
 			} else {
 				m.ship.y++
 			}
 		case " ":
 			m.firing = true
-			if m.ship.y == m.asteroid.y {
-				resetAsteroid(&m)
-				m.score++
-			}
 		}
 	}
 	return m, nil
@@ -100,47 +99,66 @@ func (m model) View() string {
 	var titleScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("20")).
-		Width(maxWidth).
+		Width(W).
 		Align(lipgloss.Center)
 	var gameScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Height(maxHeight).
-		Width(maxWidth)
+		Height(H).
+		Width(W)
 	var scoreScreen = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("50")).
-		Width(maxWidth).
+		Width(W).
 		Align(lipgloss.Center)
 
-	var screenArr []string
-	for y := 0; y < maxHeight+1; y++ {
-		var innerArr []string
-		for x := 0; x < maxWidth; x++ {
-			if x == m.asteroid.x && y == m.asteroid.y {
-				innerArr = append(innerArr, "*")
-			}
-			if y == m.ship.y {
-				if x == 0 {
-					innerArr = append(innerArr, ship)
-				} else if x > len(ship)-1 {
-					if m.firing == true {
-						innerArr = append(innerArr, "~")
-					} else {
-						innerArr = append(innerArr, " ")
-					}
+	var gameScreenContent string
+	if m.isGameOver == true {
+		gameScreenContent = "Game Over!"
+	} else {
+		screen := make([][]string, H+1)
+		for y := range screen {
+			line := make([]string, W)
+			for x := range line {
+				if x == len(line)-1 {
+					line[x] = "\n"
+				} else {
+					line[x] = " "
 				}
-			} else {
-				innerArr = append(innerArr, " ")
+			}
+			screen[y] = line
+		}
+		for x, c := range strings.Split(SHIP, "") {
+			screen[m.ship.y][x] = c
+		}
+		for _, a := range m.asteroids {
+			screen[a.y][a.x] = "*"
+		}
+		if m.firing {
+			for x := range screen[m.ship.y] {
+				if x > len(SHIP) {
+					screen[m.ship.y][x-1] = "-"
+				}
+
 			}
 		}
-		innerArr = append(innerArr, "\n")
-		screenArr = append(screenArr, strings.Join(innerArr, ""))
+		gameScreen := make([]string, len(screen))
+		for y, line := range screen {
+			gameScreen[y] = strings.Join(line, "")
+		}
+		gameScreenContent = strings.Join(gameScreen, "")
 	}
-	return lipgloss.JoinVertical(lipgloss.Center,
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
 		titleScreen.Render("Spaceship by Shivan"),
-		gameScreen.Render(strings.Join(screenArr, "")),
-		scoreScreen.Render("Score: ", strconv.Itoa(m.score)))
+		gameScreen.Render(gameScreenContent),
+		scoreScreen.Render(
+			"Score:",
+			strconv.Itoa(m.score),
+			"Asteroids:",
+			strconv.Itoa(len(m.asteroids)),
+		),
+	)
 }
 
 func main() {
