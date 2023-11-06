@@ -25,12 +25,29 @@ type position struct {
 	s int
 }
 
+type asteroid struct {
+	x           int
+	y           int
+	s           int
+	isDestroyed bool
+}
+
 type model struct {
 	isGameOver bool
 	score      int
 	firing     bool
 	ship       position
-	asteroids  []position
+	asteroids  []asteroid
+}
+
+func (m model) activeAsteroids() int {
+	var count int
+	for _, a := range m.asteroids {
+		if a.isDestroyed == false {
+			count++
+		}
+	}
+	return count
 }
 
 type TickMsg time.Time
@@ -57,17 +74,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case TickMsg:
 		for i, asteroid := range m.asteroids {
-			m.asteroids[i].x = asteroid.x - asteroid.s
-			if asteroid.x < len(SHIP) {
-				m.isGameOver = true
-			} else if m.firing == true && m.ship.y == asteroid.y {
-				m.score++
-				m.asteroids[i] = m.asteroids[len(m.asteroids)-1]
-				m.asteroids = m.asteroids[:len(m.asteroids)-1]
+			if asteroid.isDestroyed == false {
+				m.asteroids[i].x = asteroid.x - asteroid.s
+				if asteroid.x < len(SHIP) {
+					m.isGameOver = true
+				} else if m.firing == true && m.ship.y == asteroid.y && asteroid.isDestroyed == false {
+					m.asteroids[i].isDestroyed = true
+					m.score++
+				}
 			}
 		}
 		if rand.Intn(2) == 0 {
-			newAsteroid := position{x: W - 2, y: rand.Intn(H), s: rand.Intn(3) + 1}
+			newAsteroid := asteroid{x: W - 2, y: rand.Intn(H), s: rand.Intn(3) + 1, isDestroyed: false}
 			m.asteroids = append(m.asteroids, newAsteroid)
 		}
 		m.firing = false
@@ -111,7 +129,6 @@ func (m model) View() string {
 		BorderForeground(lipgloss.Color("50")).
 		Width(W).
 		Align(lipgloss.Center)
-
 	var gameScreenContent string
 	if m.isGameOver == true {
 		gameScreenContent = "Game Over!"
@@ -132,7 +149,9 @@ func (m model) View() string {
 			screen[m.ship.y][x] = c
 		}
 		for _, a := range m.asteroids {
-			screen[a.y][a.x] = "*"
+			if a.isDestroyed == false {
+				screen[a.y][a.x] = "*"
+			}
 		}
 		if m.firing {
 			for x := range screen[m.ship.y] {
@@ -153,10 +172,10 @@ func (m model) View() string {
 		titleScreen.Render("Spaceship by Shivan"),
 		gameScreen.Render(gameScreenContent),
 		scoreScreen.Render(
-			"Score:",
+			"Score: ",
 			strconv.Itoa(m.score),
-			"Asteroids:",
-			strconv.Itoa(len(m.asteroids)),
+			"Asteroids: ",
+			strconv.Itoa(m.activeAsteroids()),
 		),
 	)
 }
