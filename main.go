@@ -109,6 +109,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.paused = false
 				m.score = 0
 				m.asteroids = make([]asteroid, 0)
+				m.gameOver = false
 			}
 		case "p":
 			if m.gameOver == false {
